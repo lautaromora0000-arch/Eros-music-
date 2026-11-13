@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>EROS MUSIC — DJ panel</title>
+<style>
+:root{color-scheme:dark;--bg:#090611;--panel:#171024;--purple:#a855f7;--pink:#ec4899;--muted:#b9a9ca}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#28103f,#090611 55%);font:16px system-ui;color:#fff;padding:18px}
+main{max-width:760px;margin:auto}.hero,.card{background:#171024;border:1px solid #58347a;border-radius:18px;padding:18px;margin:14px 0;box-shadow:0 10px 35px #0006}
+h1{margin:0;color:#d8b4fe;letter-spacing:2px}small,.muted{color:var(--muted)}.tag{color:#f0abfc}
+input,button{font:inherit;border-radius:10px;padding:12px;border:1px solid #65428a;background:#0d0915;color:white}
+input{width:100%;margin:6px 0 10px}button{cursor:pointer;background:#6b21a8;border:0;font-weight:700;margin:4px 3px 4px 0}button.secondary{background:#352344}
+#player{width:100%;min-height:220px;aspect-ratio:16/9;background:#08050d;border-radius:12px;overflow:hidden}
+#player iframe{width:100%;height:100%;min-height:220px;border:0}
+ul{padding-left:22px}li{margin:8px 0;overflow-wrap:anywhere}.row{display:flex;gap:8px;flex-wrap:wrap}.row input{flex:1;min-width:180px}
+#log{white-space:pre-wrap;background:#0c0812;padding:12px;border-radius:10px;min-height:65px;color:#e9d5ff}
+.notice{border:1px solid #9d6bcb;background:#241632;padding:12px;border-radius:12px;line-height:1.45}
+</style>
+</head>
+<body><main>
+<section class="hero">
+  <h1>♛ EROS MUSIC</h1>
+  <p class="tag">TU DJ · PIDE · ESCUCHA · DISFRUTA</p>
+  <small>Panel musical de prueba. Aún no está conectado al chat de IMVU.</small>
+</section>
+<div id="hostingNotice" class="notice" hidden><b>Falta publicar el panel en HTTPS.</b><br>Este archivo está abierto como archivo local. YouTube puede mostrar Error 153 porque no recibe un HTTP Referer válido. Para probar el reproductor, el panel debe abrirse desde una dirección web HTTPS. No alcanza con modificar el enlace del video.</div>
+<section class="card">
+  <h2>Configuración</h2>
+  <label for="admin">Tu nombre de administrador (para esta prueba)</label>
+  <input id="admin" placeholder="Tu nombre en IMVU">
+  <label for="requester">Nombre de quien escribe el comando</label>
+  <input id="requester" placeholder="Nombre del usuario" value="Invitado">
+</section>
+<section class="card">
+  <h2>Reproductor de YouTube</h2>
+  <div id="player"><p class="muted" style="padding:16px">Agregá un enlace o ID de video de YouTube para cargarlo aquí.</p></div>
+  <p id="now" class="tag">Ahora suena: nada todavía</p>
+  <button class="secondary" onclick="playerCommand('pause')">Pausar</button>
+  <button class="secondary" onclick="playerCommand('play')">Reanudar</button>
+  <button onclick="nextTrack()">Siguiente (admin)</button>
+</section>
+<section class="card">
+  <h2>Chat de comandos de prueba</h2>
+  <p class="muted">Todos pueden pedir canciones con <b>!play URL</b>. En esta versión pegá un enlace o ID de YouTube.</p>
+  <div class="row"><input id="cmd" placeholder="!play https://www.youtube.com/watch?v=VIDEO_ID"><button onclick="sendCommand()">Enviar</button></div>
+  <p class="muted">Otros comandos: !queue · !np · !help · !skip · !pause · !resume</p>
+  <div id="log">EROS MUSIC: ¡Hola! Escribí !help para ver los comandos.</div>
+</section>
+<section class="card"><h2>Lista de canciones</h2><ol id="queue"><li class="muted">La cola está vacía.</li></ol></section>
+</main>
+<script>
+let queue=[], current=null, player=null;
+if(location.protocol==='file:' || location.origin==='null'){
+ document.getElementById('hostingNotice').hidden=false;
+}
+function say(s){document.getElementById('log').textContent=s}
+function videoId(raw){
+ raw=raw.trim(); if(/^[\w-]{11}$/.test(raw))return raw;
+ try{const u=new URL(raw);
+  if(u.hostname.includes('youtu.be'))return u.pathname.slice(1).split('/')[0];
+  if(u.hostname.includes('youtube.com')){if(u.pathname==='/watch')return u.searchParams.get('v');const m=u.pathname.match(/\/(?:embed|shorts)\/([\w-]{11})/);return m&&m[1]}
+ }catch(e){} return null;
+}
+function renderQueue(){const el=document.getElementById('queue');el.innerHTML='';if(!queue.length){el.innerHTML='<li class="muted">La cola está vacía.</li>';return}queue.forEach((x,i)=>{const li=document.createElement('li');li.textContent=(i+1)+'. '+x.id;el.appendChild(li)})}
+function load(id){
+ current=id;document.getElementById('now').textContent='Ahora suena: https://youtu.be/'+id;
+ const params=new URLSearchParams({enablejsapi:'1',playsinline:'1',rel:'0'});
+ if(location.protocol==='https:'||location.protocol==='http:')params.set('origin',location.origin);
+ const src='https://www.youtube.com/embed/'+encodeURIComponent(id)+'?'+params.toString();
+ document.getElementById('player').innerHTML='';
+ const frame=document.createElement('iframe');frame.id='yt';frame.title='Reproductor de YouTube';frame.src=src;
+ frame.referrerPolicy='strict-origin-when-cross-origin';frame.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';frame.allowFullscreen=true;
+ document.getElementById('player').appendChild(frame);player=frame;
+ if(location.protocol==='file:'||location.origin==='null')say('EROS MUSIC: el video se agregó, pero para reproducirlo tenés que abrir este panel desde una dirección HTTPS. El archivo local no puede proporcionar el Referer que exige YouTube.');
+}
+function nextTrack(){if(!queue.length){current=null;document.getElementById('now').textContent='Ahora suena: nada todavía';document.getElementById('player').innerHTML='<p class="muted" style="padding:16px">La cola terminó.</p>';renderQueue();return}const item=queue.shift();load(item.id);renderQueue();say('EROS MUSIC: canción cargada. Tocá reproducir en YouTube si el navegador lo solicita.')}
+function isAdmin(){const a=document.getElementById('admin').value.trim().toLowerCase(),r=document.getElementById('requester').value.trim().toLowerCase();return !!a&&a===r}
+function playerCommand(action){if(!isAdmin()){say('EROS MUSIC: solo el administrador puede controlar la reproducción en este prototipo.');return}if(!player){say('EROS MUSIC: primero cargá una canción.');return}player.contentWindow.postMessage(JSON.stringify({event:'command',func:action==='pause'?'pauseVideo':'playVideo',args:[]}), '*');say('EROS MUSIC: comando enviado. Si el reproductor no responde, usá sus controles.')}
+function sendCommand(){const field=document.getElementById('cmd'),line=field.value.trim();field.value='';if(!line)return;const parts=line.split(/\s+/),cmd=parts[0].toLowerCase(),arg=parts.slice(1).join(' ');
+ if(cmd==='!play'){const id=videoId(arg);if(!id){say('EROS MUSIC: usá !play seguido de un enlace o ID válido de YouTube.');return}queue.push({id,by:document.getElementById('requester').value.trim()||'Invitado'});if(!current)nextTrack();else{renderQueue();say('EROS MUSIC: canción agregada a la cola. ¡Gracias por tu pedido!')}}
+ else if(cmd==='!queue')say(queue.length?'EROS MUSIC: pendientes: '+queue.map((x,i)=>(i+1)+') '+x.id).join(' | '):'EROS MUSIC: no hay canciones pendientes.');
+ else if(cmd==='!np')say(current?'EROS MUSIC: ahora suena https://youtu.be/'+current:'EROS MUSIC: todavía no hay una canción.');
+ else if(cmd==='!help')say('EROS MUSIC — !play URL/ID agrega una canción; !queue muestra la cola; !np muestra la actual. !skip, !pause y !resume son controles de administrador en esta demo.');
+ else if(['!skip','!pause','!resume'].includes(cmd)){if(!isAdmin()){say('EROS MUSIC: ese comando es solo para el administrador.');return}if(cmd==='!skip')nextTrack();else playerCommand(cmd.slice(1))}
+ else say('EROS MUSIC: comando no reconocido. Escribí !help.');
+}
+document.getElementById('cmd').addEventListener('keydown',e=>{if(e.key==='Enter')sendCommand()});
+</script></body></html>
